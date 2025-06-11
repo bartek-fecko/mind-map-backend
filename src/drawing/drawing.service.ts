@@ -8,21 +8,35 @@ export class DrawingService {
 
   async createDrawing(createDrawingDto: Prisma.DrawingUncheckedCreateInput) {
     return this.db.drawing.create({
-      data: createDrawingDto,
+      data: {
+        id: createDrawingDto.id,
+        title: createDrawingDto.title,
+        boardId: createDrawingDto.boardId,
+        strokes: createDrawingDto.strokes,
+      },
     });
   }
 
-  async saveDrawing(data: Prisma.DrawingUncheckedCreateInput) {
+  async saveDrawing(data: { id: string; strokes: any; version: number }) {
     const existing = await this.getDrawing(data.id);
 
     if (existing) {
       return this.db.drawing.update({
         where: { id: data.id },
-        data,
+        data: {
+          strokes: data.strokes,
+          version: data.version,
+        },
       });
     } else {
-      return this.db.drawing.create({ data });
+      throw new Error(
+        'Cannot create new Drawing without boardId. Use createDrawing().',
+      );
     }
+  }
+
+  async getDrawingByBoardId(boardId: number) {
+    return this.db.drawing.findFirst({ where: { boardId } });
   }
 
   async getDrawing(id: string) {
@@ -37,4 +51,3 @@ export class DrawingService {
     return this.db.drawing.deleteMany();
   }
 }
- 

@@ -18,43 +18,54 @@ export class NotesGateway {
   constructor(private readonly notesService: NotesService) {}
 
   @SubscribeMessage(NotesSocketEvents.GET_ALL)
-  async handleRequestAllNotes(@ConnectedSocket() client: Socket) {
-    const notes = await this.notesService.getAllNotes();
+  async handleRequestAllNotes(
+    @MessageBody() boardId: number,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const notes = await this.notesService.getAllNotes(boardId);
     client.emit(NotesSocketEvents.GET_ALL, notes);
   }
 
   @SubscribeMessage(NotesSocketEvents.ADD)
   async handleAddNote(
-    @MessageBody() note: Prisma.NoteUncheckedCreateInput,
+    @MessageBody()
+    payload: { note: Prisma.NoteUncheckedCreateInput; boardId: number },
     @ConnectedSocket() client: Socket,
   ) {
-    const newNote = await this.notesService.addNote(note);
+    const newNote = await this.notesService.addNote({
+      ...payload.note,
+      boardId: payload.boardId,
+    });
     client.broadcast.emit(NotesSocketEvents.ADD, newNote);
     return newNote;
   }
 
   @SubscribeMessage(NotesSocketEvents.UPDATE)
-  handleUpdateNote(
+  async handleUpdateNote(
     @MessageBody()
-    note: Prisma.NoteUncheckedUpdateInput,
+    payload: { id: string; note: Prisma.NoteUncheckedUpdateInput },
     @ConnectedSocket() client: Socket,
   ) {
-    this.notesService.updateNote(note);
-    client.broadcast.emit(NotesSocketEvents.UPDATE, note);
+    const { id, note } = payload;
+    const updatedNote = await this.notesService.updateNote(id, note);
+    client.broadcast.emit(NotesSocketEvents.UPDATE, updatedNote);
   }
 
   @SubscribeMessage(NotesSocketEvents.REMOVE)
-  handleRemoveNote(
-    @MessageBody() id: string,
+  async handleRemoveNote(
+    @MessageBody() payload: { id: string; boardId: number },
     @ConnectedSocket() client: Socket,
   ) {
-    this.notesService.removeNote(id);
-    client.broadcast.emit(NotesSocketEvents.REMOVE, id);
+    await this.notesService.removeNote(payload.id, payload.boardId);
+    client.broadcast.emit(NotesSocketEvents.REMOVE, payload.id);
   }
 
   @SubscribeMessage(NotesSocketEvents.REMOVE_ALL)
-  handleRemoveAllNotes(@ConnectedSocket() client: Socket) {
-    this.notesService.removeAllNotes();
+  async handleRemoveAllNotes(
+    @MessageBody() boardId: number,
+    @ConnectedSocket() client: Socket,
+  ) {
+    await this.notesService.removeAllNotes(boardId);
     client.broadcast.emit(NotesSocketEvents.REMOVE_ALL);
   }
 }

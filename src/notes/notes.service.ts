@@ -4,32 +4,38 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class NotesService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly db: DatabaseService) {}
 
-  async getAllNotes() {
-    return this.databaseService.note.findMany();
+  async getAllNotes(boardId: number) {
+    return this.db.note.findMany({ where: { boardId } });
   }
 
-  async addNote(createNoteDto: Prisma.NoteUncheckedCreateInput) {
-    return this.databaseService.note.create({
-      data: createNoteDto,
+  async addNote(note: Prisma.NoteUncheckedCreateInput & { boardId: number }) {
+    return this.db.note.create({
+      data: {
+        id: note.id,
+        x: note.x,
+        y: note.y,
+        width: note.width,
+        height: note.height,
+        content: note.content,
+        boardId: note.boardId,
+      },
     });
   }
 
-  async updateNote(updateNoteDto: Prisma.NoteUncheckedUpdateInput) {
-    if (typeof updateNoteDto.id !== 'string') return null;
-
-    return this.databaseService.note.update({
-      where: { id: updateNoteDto.id },
-      data: updateNoteDto,
+  async updateNote(id: string, note: Prisma.NoteUncheckedUpdateInput) {
+    return this.db.note.update({
+      where: { id },
+      data: note,
     });
   }
 
-  async removeNote(id: string) {
-    await this.databaseService.note.delete({ where: { id } });
+  async removeNote(id: string, boardId: number) {
+    return this.db.note.delete({ where: { id, boardId } });
   }
 
-  async removeAllNotes() {
-    await this.databaseService.note.deleteMany({});
+  async removeAllNotes(boardId: number) {
+    return this.db.note.deleteMany({ where: { boardId } });
   }
 }

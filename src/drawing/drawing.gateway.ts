@@ -8,6 +8,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { DrawingSocketEvents } from './socketEvents';
 import { DrawingService } from './drawing.service';
+import { randomUUID } from 'crypto';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class DrawingGateway {
@@ -18,50 +19,64 @@ export class DrawingGateway {
 
   @SubscribeMessage(DrawingSocketEvents.LOAD_DRAWING)
   async handleLoadDrawing(
-    @MessageBody() drawingId: string,
+    @MessageBody() boardId: number,
     @ConnectedSocket() client: Socket,
   ) {
-    const drawing = await this.drawingService.getDrawing(drawingId);
-    client.emit(DrawingSocketEvents.LOAD_DRAWING, drawing?.strokes || []);
+    let drawing = await this.drawingService.getDrawingByBoardId(boardId);
+
+    if (!drawing) {
+      drawing = await this.drawingService.createDrawing({
+        id: randomUUID(),
+        boardId,
+        strokes: [],
+      });
+    }
+
+    client.emit(DrawingSocketEvents.LOAD_DRAWING, {
+      boardId,
+      strokes: drawing.strokes,
+    });
   }
 
   @SubscribeMessage(DrawingSocketEvents.ADD_STROKE)
   async handleAddStroke(
-    @MessageBody() data: any,
+    @MessageBody()
+    data: {
+      boardId: number;
+      id: string;
+      points: any[];
+      strokeColor: string;
+      lineWidth: number;
+      tool: string;
+    },
     @ConnectedSocket() client: Socket,
   ) {
-    const { drawingId, ...stroke } = data;
-    if (!drawingId) return;
+    const { boardId, ...stroke } = data;
+    if (!boardId) return;
 
-    const drawing = await this.drawingService.getDrawing(drawingId);
-    const strokes = Array.isArray(drawing?.strokes) ? drawing.strokes : [];
+    let drawing = await this.drawingService.getDrawingByBoardId(boardId);
+
+    const strokes = Array.isArray(drawing.strokes) ? drawing.strokes : [];
     const updatedStrokes = [...strokes, stroke];
 
-    client.broadcast.emit(DrawingSocketEvents.ADD_STROKE, {
-      drawingId,
-      ...stroke,
+    await this.drawingService.saveDrawing({
+      id: drawing.id,
+      strokes: updatedStrokes,
+      version: (drawing.version || 1) + 1,
     });
 
-    this.drawingService
-      .saveDrawing({
-        id: drawingId,
-        strokes: updatedStrokes,
-        version: (drawing?.version || 1) + 1,
-      })
-      .catch((err) => {
-        console.error('Błąd zapisu rysunku:', err);
-      });
+    client.broadcast.emit(DrawingSocketEvents.ADD_STROKE, { boardId, stroke });
   }
 
   @SubscribeMessage(DrawingSocketEvents.REMOVE_STROKE)
   async handleRemoveStroke(
-    @MessageBody() data: { drawingId: string; strokeId: string },
+    @MessageBody() data: { boardId: number; strokeId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const { drawingId, strokeId } = data;
-    if (!drawingId || !strokeId) return;
+    const { boardId, strokeId } = data;
+    if (!boardId || !strokeId) return;
 
-    const drawing = await this.drawingService.getDrawing(drawingId);
+    const drawing = await this.drawingService.getDrawingByBoardId(boardId);
     if (!drawing) return;
 
     const strokes = Array.isArray(drawing.strokes) ? drawing.strokes : [];
@@ -69,46 +84,53 @@ export class DrawingGateway {
     const updatedStrokes = strokes.filter(
       (stroke: any) => stroke.id !== strokeId,
     );
+
     await this.drawingService.saveDrawing({
-      id: drawingId,
+      id: drawing.id,
       strokes: updatedStrokes,
       version: (drawing.version || 1) + 1,
     });
 
     client.broadcast.emit(DrawingSocketEvents.REMOVE_STROKE, {
-      drawingId,
+      boardId,
       strokeId,
     });
   }
 
   @SubscribeMessage(DrawingSocketEvents.REMOVE_ALL_STROKES)
   async handleRemoveAllStrokes(
-    @MessageBody() drawingId: string,
+    @MessageBody() boardId: number,
     @ConnectedSocket() client: Socket,
   ) {
-    if (!drawingId) return;
+    if (!boardId) return;
 
-    client.broadcast.emit(DrawingSocketEvents.REMOVE_ALL_STROKES, drawingId);
+    const drawing = await this.drawingService.getDrawingByBoardId(boardId);
+    if (!drawing) return;
+
     await this.drawingService.saveDrawing({
-      id: drawingId,
+      id: drawing.id,
       strokes: [],
       version: 1,
     });
+
+    client.broadcast.emit(DrawingSocketEvents.REMOVE_ALL_STROKES, boardId);
   }
 
   @SubscribeMessage(DrawingSocketEvents.UNDO_CLEAR_ALL)
   async handleUndoClearAll(
-    @MessageBody() data: { drawingId: string; strokes: any[] },
+    @MessageBody() data: { boardId: number; strokes: any[] },
     @ConnectedSocket() client: Socket,
   ) {
-    const { drawingId, strokes } = data;
-    if (!drawingId || !Array.isArray(strokes)) return;
+    const { boardId, strokes } = data;
+    if (!boardId || !Array.isArray(strokes)) return;
+
+    const drawing = await this.drawingService.getDrawingByBoardId(boardId);
+    if (!drawing) return;
 
     await this.drawingService.saveDrawing({
-      id: drawingId,
+      id: drawing.id,
       strokes,
-      version:
-        (await this.drawingService.getDrawing(drawingId))?.version + 1 || 1,
+      version: (drawing.version || 1) + 1,
     });
 
     client.broadcast.emit(DrawingSocketEvents.UNDO_CLEAR_ALL, data);

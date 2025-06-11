@@ -7,6 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Board {
+  id        Int       @id @default(autoincrement())
+  title     String
+  notes     Note[]
+  drawings  Drawing[]
+  gifs      Gif[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
 model Note {
   id        String   @id
   content   String
@@ -14,6 +24,8 @@ model Note {
   y         String
   width     Int
   height    Int
+  boardId   Int
+  board     Board    @relation(fields: [boardId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -23,6 +35,22 @@ model Drawing {
   title     String?
   strokes   Json
   version   Int      @default(1)
+  boardId   Int
+  board     Board    @relation(fields: [boardId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Gif {
+  id        String   @id
+  url       String
+  alt       String
+  x         Int
+  y         Int
+  width     Int
+  height    Int
+  boardId   Int
+  board     Board    @relation(fields: [boardId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
