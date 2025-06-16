@@ -21,6 +21,7 @@ export class AuthController {
       secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: 'lax',
+      domain: process.env.FRONTEND_URL,
     });
 
     res.send(`
