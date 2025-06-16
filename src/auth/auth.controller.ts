@@ -15,13 +15,14 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res: Response) {
     const jwt = this.authService.generateJwt(req.user);
+    const frontendDomain = new URL(process.env.FRONTEND_URL).hostname;
 
     res.cookie('token', jwt, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: 'lax',
-      domain: process.env.FRONTEND_URL,
+      domain: frontendDomain,
     });
 
     res.send(`
