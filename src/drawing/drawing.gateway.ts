@@ -8,34 +8,53 @@ import {
 import { Server, Socket } from 'socket.io';
 import { DrawingSocketEvents } from './socketEvents';
 import { DrawingService } from './drawing.service';
+import { BoardAccessService } from '../boards/board-access.service';
 import { randomUUID } from 'crypto';
+import { ForbiddenException } from '@nestjs/common';
+import { getBoardRoom } from 'src/utils/utils';
 
-@WebSocketGateway({ cors: { origin: '*' } })
+@WebSocketGateway({
+  cors: { origin: process.env.FRONTEND_URL, credentials: true },
+})
 export class DrawingGateway {
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly drawingService: DrawingService) {}
+  constructor(
+    private readonly drawingService: DrawingService,
+    private readonly boardAccessService: BoardAccessService,
+  ) {}
 
   @SubscribeMessage(DrawingSocketEvents.LOAD_DRAWING)
   async handleLoadDrawing(
     @MessageBody() boardId: number,
     @ConnectedSocket() client: Socket,
   ) {
-    let drawing = await this.drawingService.getDrawingByBoardId(boardId);
+    try {
+      await this.boardAccessService.checkAccess(boardId, client.data.userId);
 
-    if (!drawing) {
-      drawing = await this.drawingService.createDrawing({
-        id: randomUUID(),
+      client.join(getBoardRoom(boardId));
+
+      let drawing = await this.drawingService.getDrawingByBoardId(boardId);
+
+      if (!drawing) {
+        drawing = await this.drawingService.createDrawing({
+          id: randomUUID(),
+          boardId,
+          strokes: [],
+        });
+      }
+
+      client.emit(DrawingSocketEvents.LOAD_DRAWING, {
         boardId,
-        strokes: [],
+        strokes: drawing.strokes,
       });
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        client.emit('error', 'Access denied to this board');
+        client.disconnect(true);
+      }
     }
-
-    client.emit(DrawingSocketEvents.LOAD_DRAWING, {
-      boardId,
-      strokes: drawing.strokes,
-    });
   }
 
   @SubscribeMessage(DrawingSocketEvents.ADD_STROKE)
@@ -51,21 +70,33 @@ export class DrawingGateway {
     },
     @ConnectedSocket() client: Socket,
   ) {
-    const { boardId, ...stroke } = data;
-    if (!boardId) return;
+    try {
+      await this.boardAccessService.checkAccess(
+        data.boardId,
+        client.data.userId,
+      );
 
-    let drawing = await this.drawingService.getDrawingByBoardId(boardId);
+      const { boardId, ...stroke } = data;
+      let drawing = await this.drawingService.getDrawingByBoardId(boardId);
 
-    const strokes = Array.isArray(drawing.strokes) ? drawing.strokes : [];
-    const updatedStrokes = [...strokes, stroke];
+      const strokes = Array.isArray(drawing.strokes) ? drawing.strokes : [];
+      const updatedStrokes = [...strokes, stroke];
 
-    await this.drawingService.saveDrawing({
-      id: drawing.id,
-      strokes: updatedStrokes,
-      version: (drawing.version || 1) + 1,
-    });
+      await this.drawingService.saveDrawing({
+        id: drawing.id,
+        strokes: updatedStrokes,
+        version: (drawing.version || 1) + 1,
+      });
 
-    client.broadcast.emit(DrawingSocketEvents.ADD_STROKE, { boardId, stroke });
+      client.to(getBoardRoom(boardId)).emit(DrawingSocketEvents.ADD_STROKE, {
+        boardId,
+        stroke,
+      });
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        client.emit('error', 'Access denied to this board');
+      }
+    }
   }
 
   @SubscribeMessage(DrawingSocketEvents.REMOVE_STROKE)
@@ -73,28 +104,39 @@ export class DrawingGateway {
     @MessageBody() data: { boardId: number; strokeId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const { boardId, strokeId } = data;
-    if (!boardId || !strokeId) return;
+    try {
+      await this.boardAccessService.checkAccess(
+        data.boardId,
+        client.data.userId,
+      );
 
-    const drawing = await this.drawingService.getDrawingByBoardId(boardId);
-    if (!drawing) return;
+      const { boardId, strokeId } = data;
+      if (!boardId || !strokeId) return;
 
-    const strokes = Array.isArray(drawing.strokes) ? drawing.strokes : [];
+      const drawing = await this.drawingService.getDrawingByBoardId(boardId);
+      if (!drawing) return;
 
-    const updatedStrokes = strokes.filter(
-      (stroke: any) => stroke.id !== strokeId,
-    );
+      const strokes = Array.isArray(drawing.strokes) ? drawing.strokes : [];
 
-    await this.drawingService.saveDrawing({
-      id: drawing.id,
-      strokes: updatedStrokes,
-      version: (drawing.version || 1) + 1,
-    });
+      const updatedStrokes = strokes.filter(
+        (stroke: any) => stroke.id !== strokeId,
+      );
 
-    client.broadcast.emit(DrawingSocketEvents.REMOVE_STROKE, {
-      boardId,
-      strokeId,
-    });
+      await this.drawingService.saveDrawing({
+        id: drawing.id,
+        strokes: updatedStrokes,
+        version: (drawing.version || 1) + 1,
+      });
+
+      client.to(getBoardRoom(boardId)).emit(DrawingSocketEvents.REMOVE_STROKE, {
+        boardId,
+        strokeId,
+      });
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        client.emit('error', 'Access denied to this board');
+      }
+    }
   }
 
   @SubscribeMessage(DrawingSocketEvents.REMOVE_ALL_STROKES)
@@ -102,18 +144,26 @@ export class DrawingGateway {
     @MessageBody() boardId: number,
     @ConnectedSocket() client: Socket,
   ) {
-    if (!boardId) return;
+    try {
+      await this.boardAccessService.checkAccess(boardId, client.data.userId);
 
-    const drawing = await this.drawingService.getDrawingByBoardId(boardId);
-    if (!drawing) return;
+      const drawing = await this.drawingService.getDrawingByBoardId(boardId);
+      if (!drawing) return;
 
-    await this.drawingService.saveDrawing({
-      id: drawing.id,
-      strokes: [],
-      version: 1,
-    });
+      await this.drawingService.saveDrawing({
+        id: drawing.id,
+        strokes: [],
+        version: 1,
+      });
 
-    client.broadcast.emit(DrawingSocketEvents.REMOVE_ALL_STROKES, boardId);
+      client
+        .to(getBoardRoom(boardId))
+        .emit(DrawingSocketEvents.REMOVE_ALL_STROKES, boardId);
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        client.emit('error', 'Access denied to this board');
+      }
+    }
   }
 
   @SubscribeMessage(DrawingSocketEvents.UNDO_CLEAR_ALL)
@@ -121,24 +171,51 @@ export class DrawingGateway {
     @MessageBody() data: { boardId: number; strokes: any[] },
     @ConnectedSocket() client: Socket,
   ) {
-    const { boardId, strokes } = data;
-    if (!boardId || !Array.isArray(strokes)) return;
+    try {
+      await this.boardAccessService.checkAccess(
+        data.boardId,
+        client.data.userId,
+      );
 
-    const drawing = await this.drawingService.getDrawingByBoardId(boardId);
-    if (!drawing) return;
+      const { boardId, strokes } = data;
+      if (!boardId || !Array.isArray(strokes)) return;
 
-    await this.drawingService.saveDrawing({
-      id: drawing.id,
-      strokes,
-      version: (drawing.version || 1) + 1,
-    });
+      const drawing = await this.drawingService.getDrawingByBoardId(boardId);
+      if (!drawing) return;
 
-    client.broadcast.emit(DrawingSocketEvents.UNDO_CLEAR_ALL, data);
+      await this.drawingService.saveDrawing({
+        id: drawing.id,
+        strokes,
+        version: (drawing.version || 1) + 1,
+      });
+
+      client
+        .to(getBoardRoom(boardId))
+        .emit(DrawingSocketEvents.UNDO_CLEAR_ALL, data);
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        client.emit('error', 'Access denied to this board');
+      }
+    }
   }
 
   @SubscribeMessage(DrawingSocketEvents.REMOVE_ALL)
-  handleRemoveAll(@ConnectedSocket() client: Socket) {
-    this.drawingService.deleteAllDrawings();
-    client.broadcast.emit(DrawingSocketEvents.REMOVE_ALL);
+  async handleRemoveAll(
+    @MessageBody() boardId: number,
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      await this.boardAccessService.checkAccess(boardId, client.data.userId);
+
+      await this.drawingService.clearDrawingStrokes(boardId);
+
+      client
+        .to(getBoardRoom(boardId))
+        .emit(DrawingSocketEvents.REMOVE_ALL, boardId);
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        client.emit('error', 'Access denied to this board');
+      }
+    }
   }
 }

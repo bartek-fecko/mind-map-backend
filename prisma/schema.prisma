@@ -7,14 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id     Int         @id @default(autoincrement())
+  email  String      @unique
+  name   String?
+  image  String?
+  boards BoardUser[]
+}
+
 model Board {
-  id        Int       @id @default(autoincrement())
+  id        Int         @id @default(autoincrement())
   title     String
   notes     Note[]
-  drawings  Drawing[]
-  gifs      Gif[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  users     BoardUser[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  Drawing   Drawing[]
+  Gif       Gif[]
+}
+
+model BoardUser {
+  userId  Int
+  boardId Int
+  role    String
+  user    User   @relation(fields: [userId], references: [id])
+  board   Board  @relation(fields: [boardId], references: [id])
+
+  @@id([userId, boardId])
 }
 
 model Note {

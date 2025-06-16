@@ -12,6 +12,19 @@ export class GifsService {
     });
   }
 
+  async getBoardIdByGifId(gifId: string): Promise<number> {
+    const gif = await this.db.gif.findUnique({
+      where: { id: gifId },
+      select: { boardId: true },
+    });
+
+    if (!gif) {
+      throw new Error('Gif not found');
+    }
+
+    return gif.boardId;
+  }
+
   async createGif(boardId: number, gif: Prisma.GifUncheckedCreateInput) {
     return this.db.gif.create({
       data: {

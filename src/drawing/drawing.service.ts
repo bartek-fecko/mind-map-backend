@@ -43,6 +43,20 @@ export class DrawingService {
     return this.db.drawing.findUnique({ where: { id } });
   }
 
+  async clearDrawingStrokes(boardId: number) {
+    const drawing = await this.getDrawingByBoardId(boardId);
+    if (!drawing) {
+      throw new Error(`Drawing with boardId ${boardId} not found`);
+    }
+    return this.db.drawing.update({
+      where: { id: drawing.id },
+      data: {
+        strokes: [],
+        version: (drawing.version || 1) + 1,
+      },
+    });
+  }
+
   async deleteDrawing(id: string) {
     return this.db.drawing.delete({ where: { id } });
   }
