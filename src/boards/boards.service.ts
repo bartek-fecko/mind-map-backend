@@ -9,7 +9,7 @@ import { DatabaseService } from 'src/database/database.service';
 export class BoardsService {
   constructor(private readonly db: DatabaseService) {}
 
-  getAllBoards(userId: number) {
+  getAllBoards(userId: string) {
     return this.db.board.findMany({
       where: {
         users: {
@@ -24,7 +24,7 @@ export class BoardsService {
     });
   }
 
-  async createBoard(title: string, userId: number) {
+  async createBoard(title: string, userId: string) {
     return this.db.board.create({
       data: {
         title,
@@ -38,7 +38,7 @@ export class BoardsService {
     });
   }
 
-  async getBoardById(boardId: number, userId: number) {
+  async getBoardById(boardId: number, userId: string) {
     const board = await this.db.board.findUnique({
       where: { id: boardId },
       include: { users: true },
@@ -61,14 +61,14 @@ export class BoardsService {
     boardId: number,
     targetUserEmail: string,
     role: 'editor' | 'viewer',
-    ownerId: number,
+    ownerId: string,
   ) {
     const targetUser = await this.db.user.findUnique({
       where: { email: targetUserEmail },
     });
 
     if (!targetUser) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     const ownership = await this.db.boardUser.findFirst({
@@ -80,7 +80,7 @@ export class BoardsService {
     });
 
     if (!ownership) {
-      throw new Error('Only owner can share this board');
+      throw new ForbiddenException('Only owner can share this board');
     }
 
     return this.db.boardUser.create({

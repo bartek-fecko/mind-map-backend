@@ -1,32 +1,26 @@
-import { Socket } from 'socket.io';
-import { verify } from 'jsonwebtoken';
+import { JwtService } from '@nestjs/jwt';
 
 export class SocketAuthMiddleware {
-  use(socket: Socket, next: (err?: any) => void) {
+  private jwtService = new JwtService({
+    secret: process.env.JWT_SECRET,
+  });
+
+  async use(socket: any, next: any) {
     try {
-      const cookie = socket.handshake.headers.cookie;
+      const token =
+        socket.handshake.auth?.token ||
+        socket.handshake.headers?.authorization?.split(' ')[1];
 
-      if (!cookie) {
-        throw new Error('No cookie');
+      if (!token) {
+        return next(new Error('No token provided'));
       }
 
-      const tokenCookie = cookie
-        .split(';')
-        .map((c) => c.trim())
-        .find((c) => c.startsWith('token='));
+      const payload = this.jwtService.verify(token);
 
-      if (!tokenCookie) {
-        throw new Error('No token cookie');
-      }
-
-      const token = tokenCookie.split('=')[1];
-      const payload = verify(token, process.env.JWT_SECRET);
-
-      socket.data.userId = (payload as any).sub;
-
+      socket.data.userId = payload.id;
       next();
     } catch (error) {
-      next(new Error('Unauthorized'));
+      next(new Error('Invalid token'));
     }
   }
 }

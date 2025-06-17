@@ -7,5 +7,6 @@ import { UsersController } from './users.controller';
   imports: [DatabaseModule],
   providers: [UsersService],
   controllers: [UsersController],
+  exports: [UsersService],
 })
 export class UsersModule {}

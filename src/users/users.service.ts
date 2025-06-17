@@ -29,4 +29,20 @@ export class UsersService {
 
     return user;
   }
+
+  async create(data: {
+    email: string;
+    name?: string;
+    image?: string;
+    password?: string;
+  }) {
+    return this.db.user.create({
+      data: {
+        email: data.email,
+        name: data.name,
+        image: data.image,
+        password: data.password,
+      },
+    });
+  }
 }

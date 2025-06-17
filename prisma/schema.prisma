@@ -8,11 +8,12 @@ datasource db {
 }
 
 model User {
-  id     Int         @id @default(autoincrement())
-  email  String      @unique
-  name   String?
-  image  String?
-  boards BoardUser[]
+  id       String      @id @default(uuid())
+  email    String      @unique
+  password String?
+  name     String?
+  image    String?
+  boards   BoardUser[]
 }
 
 model Board {
@@ -27,7 +28,7 @@ model Board {
 }
 
 model BoardUser {
-  userId  Int
+  userId  String
   boardId Int
   role    String
   user    User   @relation(fields: [userId], references: [id])

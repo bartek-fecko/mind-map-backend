@@ -5,7 +5,7 @@ import { BoardsService } from '../boards/boards.service';
 export class BoardAccessService {
   constructor(private readonly boardsService: BoardsService) {}
 
-  async checkAccess(boardId: number, userId: number) {
+  async checkAccess(boardId: number, userId: string) {
     try {
       await this.boardsService.getBoardById(boardId, userId);
     } catch (error) {
