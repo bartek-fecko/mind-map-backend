@@ -1,18 +1,26 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
-import { BoardsService } from '../boards/boards.service';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Socket } from 'socket.io';
+import { DatabaseService } from 'src/database/database.service';
 
 @Injectable()
-export class BoardAccessService {
-  constructor(private readonly boardsService: BoardsService) {}
+export class BoardsAccessService {
+  constructor(private readonly db: DatabaseService) {}
 
-  async checkAccess(boardId: number, userId: string) {
-    try {
-      await this.boardsService.getBoardById(boardId, userId);
-    } catch (error) {
-      if (error instanceof ForbiddenException) {
-        throw new ForbiddenException('Access denied to this board');
+  async checkBoardAccess(boardId: number, client: Socket) {
+    if (!client.data.boardAccess[boardId]) {
+      const board = await this.db.board.findFirst({
+        where: {
+          id: boardId,
+          users: { some: { userId: client.data.userId } },
+        },
+        select: { id: true },
+      });
+
+      if (!board) {
+        throw new ForbiddenException('You do not have access to this board');
       }
-      throw error;
+
+      client.data.boardAccess[boardId] = true;
     }
   }
 }

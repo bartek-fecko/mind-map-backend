@@ -18,6 +18,7 @@ export class SocketAuthMiddleware {
       const payload = this.jwtService.verify(token);
 
       socket.data.userId = payload.id;
+      socket.data.boardAccess = {};
       next();
     } catch (error) {
       next(new Error('Invalid token'));

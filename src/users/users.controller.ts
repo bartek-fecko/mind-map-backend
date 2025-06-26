@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   NotFoundException,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -13,7 +14,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get('me')
-  // @UseGuards(JwtGuard)
+  @UseGuards(JwtGuard)
   async getMe(@Req() req) {
     const { email } = req.user;
 
@@ -27,8 +28,8 @@ export class UsersController {
   }
 
   @Get('/')
-  async getAll() {
-    const users = await this.usersService.findAll();
+  async getAll(@Query('search') search: string) {
+    const users = await this.usersService.findAll(search);
     return users;
   }
 }

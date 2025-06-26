@@ -7,10 +7,10 @@ import { UsersModule } from 'src/users/users.module';
 
 @Module({
   imports: [
-    UsersModule,  
+    UsersModule,
     JwtModule.register({ secret: process.env.JWT_SECRET }),
   ],
-  providers: [AuthService, JwtStrategy], 
+  providers: [AuthService, JwtStrategy],
   exports: [AuthService],
   controllers: [AuthController],
 })

@@ -4,7 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from 'src/users/users.service';
 import { OAuth2Client } from 'google-auth-library';
 
-const EXPIRE_TIME = 20 * 1000;
+const EXPIRE_TIME = 20 * 60 * 1000;
+// const EXPIRE_TIME = 10 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -16,29 +17,30 @@ export class AuthService {
   async login(dto: any) {
     const user = await this.validateUser(dto);
     const payload = {
-      username: user.email,
-      sub: {
-        name: user.name,
-      },
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.image,
+      sub: user.id,
     };
 
     return {
       user,
       backendTokens: {
         accessToken: await this.jwtService.signAsync(payload, {
-          expiresIn: '20s',
+          expiresIn: '20m',
           secret: process.env.JWT_SECRET,
         }),
         refreshToken: await this.jwtService.signAsync(payload, {
           expiresIn: '7d',
           secret: process.env.JWT_REFRESH_SECRET,
         }),
-        expiresIn: new Date().setTime(new Date().getTime() + EXPIRE_TIME),
+        expiresIn: Date.now() + EXPIRE_TIME,
       },
     };
   }
 
-  async validateGoogleUser(token: string) {
+  async googleLogin(token: string) {
     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     const ticket = await client.verifyIdToken({
       idToken: token,
@@ -61,53 +63,54 @@ export class AuthService {
       id: user.id,
       username: user.email,
       image: user.image,
-      sub: { name: user.name },
+      sub: user.id,
     };
 
     return {
       user,
       backendTokens: {
         accessToken: await this.jwtService.signAsync(backendPayload, {
-          expiresIn: '20s',
+          expiresIn: '20m',
           secret: process.env.JWT_SECRET,
         }),
         refreshToken: await this.jwtService.signAsync(backendPayload, {
           expiresIn: '7d',
           secret: process.env.JWT_REFRESH_SECRET,
         }),
-        expiresIn: new Date().setTime(new Date().getTime() + EXPIRE_TIME),
+        expiresIn: Date.now() + EXPIRE_TIME,
       },
     };
   }
 
   async validateUser(dto: any) {
-    const user = await this.userService.findByEmail(dto.username);
+    const user = await this.userService.findByEmail(dto.email);
 
     if (user && (await compare(dto.password, user.password))) {
       const { password, ...result } = user;
       return result;
     }
+
     throw new UnauthorizedException();
   }
 
   async refreshToken(user: any) {
     const payload = {
       id: user.id,
-      username: user.username,
+      name: user.name,
       image: user.image,
-      sub: user.sub,
+      sub: user.id,
     };
 
     return {
       accessToken: await this.jwtService.signAsync(payload, {
-        expiresIn: '20s',
+        expiresIn: '20m',
         secret: process.env.JWT_SECRET,
       }),
       refreshToken: await this.jwtService.signAsync(payload, {
         expiresIn: '7d',
         secret: process.env.JWT_REFRESH_SECRET,
       }),
-      expiresIn: new Date().setTime(new Date().getTime() + EXPIRE_TIME),
+      expiresIn: Date.now() + EXPIRE_TIME,
     };
   }
 }

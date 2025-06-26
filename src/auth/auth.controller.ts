@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Post,
-  Req,
-  Request,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UsersService } from 'src/users/users.service';
 import { RefreshJwtGuard } from './guards/refresh.guard';
@@ -18,10 +10,10 @@ export class AuthController {
     private authService: AuthService,
   ) {}
 
-  // @Post('register')
-  // async registerUser(@Body() dto: any) {
-  //   return await this.userService.create(dto);
-  // }
+  @Post('register')
+  async registerUser(@Body() dto: any) {
+    return await this.userService.create(dto);
+  }
 
   @Post('login')
   async login(@Body() dto: any) {
@@ -30,7 +22,7 @@ export class AuthController {
 
   @Post('google-login')
   async googleLogin(@Body() body: { access_token: string }) {
-    return await this.authService.validateGoogleUser(body.access_token);
+    return await this.authService.googleLogin(body.access_token);
   }
 
   @UseGuards(RefreshJwtGuard)

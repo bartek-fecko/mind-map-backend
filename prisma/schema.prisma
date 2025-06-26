@@ -8,23 +8,30 @@ datasource db {
 }
 
 model User {
-  id       String      @id @default(uuid())
-  email    String      @unique
-  password String?
-  name     String?
-  image    String?
-  boards   BoardUser[]
+  id                    String         @id @default(uuid())
+  email                 String         @unique
+  password              String?
+  name                  String?
+  image                 String?
+  boards                BoardUser[]
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  Notification          Notification[]
+  notificationsFromUser Notification[] @relation("NotificationFromUser")
 }
 
 model Board {
-  id        Int         @id @default(autoincrement())
-  title     String
-  notes     Note[]
-  users     BoardUser[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  Drawing   Drawing[]
-  Gif       Gif[]
+  id             Int         @id @default(autoincrement())
+  title          String
+  description    String?
+  cardColorTheme String
+  imageUrl       String?
+  notes          Note[]
+  users          BoardUser[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  Drawing        Drawing[]
+  Gif            Gif[]
 }
 
 model BoardUser {
@@ -73,4 +80,20 @@ model Gif {
   board     Board    @relation(fields: [boardId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  type       String
+  userId     String
+  message    String
+  url        String
+  fromUserId String?
+  boardId    Int?
+  boardTitle String?
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user     User  @relation(fields: [userId], references: [id])
+  fromUser User? @relation("NotificationFromUser", fields: [fromUserId], references: [id])
 }
