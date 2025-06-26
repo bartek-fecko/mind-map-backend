@@ -8,8 +8,10 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SocketModule } from './socket.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AppController } from './app.controller';
 
 @Module({
+  controllers: [AppController],
   imports: [
     NotesModule,
     GifsModule,
