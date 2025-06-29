@@ -6,7 +6,6 @@ import { ServerOptions } from 'socket.io';
 import { SocketAuthMiddleware } from './middlewares/auth.middleware';
 import { join } from 'path';
 import * as express from 'express';
-import { WsExceptionsFilter } from './utils/utils';
 
 class CustomIoAdapter extends IoAdapter {
   createIOServer(port: number, options?: ServerOptions) {
@@ -25,7 +24,6 @@ async function bootstrap() {
   app.useWebSocketAdapter(new CustomIoAdapter(app));
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   app.use('/uploads', express.static(join(__dirname, '..', 'uploads')));
-  app.useGlobalFilters(new WsExceptionsFilter());
 
   app.enableCors({
     origin: process.env.FRONTEND_URL,
