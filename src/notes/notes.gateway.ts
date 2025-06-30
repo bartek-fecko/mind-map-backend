@@ -62,7 +62,6 @@ export class NotesGateway {
       ...payload.note,
       boardId: payload.boardId,
     });
-    console.log(newNote);
 
     client
       .to(getBoardRoom(payload.boardId))
@@ -93,6 +92,55 @@ export class NotesGateway {
     client
       .to(getBoardRoom(payload.boardId))
       .emit(NotesSocketEvents.UPDATE, updatedNote);
+  }
+
+  @UseGuards(BoardAccessGuard)
+  @SubscribeMessage(NotesSocketEvents.INCREASE_Z_INDEX)
+  async handleIncreaseZIndex(
+    @MessageBody()
+    data: {
+      payload: { id: string; boardId: number; callback?: Function };
+    },
+  ) {
+    const { id, boardId } = data.payload;
+
+    const result = await this.notesService.moveNoteZIndexUp(id, boardId);
+
+    const [movedNote, swappedNote] = result;
+    this.server
+      .to(getBoardRoom(boardId))
+      .emit(NotesSocketEvents.UPDATE, movedNote);
+    if (swappedNote) {
+      this.server
+        .to(getBoardRoom(boardId))
+        .emit(NotesSocketEvents.UPDATE, swappedNote);
+    }
+
+    return { swappedNote };
+  }
+
+  @UseGuards(BoardAccessGuard)
+  @SubscribeMessage(NotesSocketEvents.DECREASE_Z_INDEX)
+  async handleDecreaseZIndex(
+    @MessageBody()
+    data: {
+      payload: { id: string; boardId: number };
+    },
+  ) {
+    const { id, boardId } = data.payload;
+
+    const result = await this.notesService.moveNoteZIndexDown(id, boardId);
+
+    const [movedNote, swappedNote] = result;
+    this.server
+      .to(getBoardRoom(boardId))
+      .emit(NotesSocketEvents.UPDATE, movedNote);
+    if (swappedNote) {
+      this.server
+        .to(getBoardRoom(boardId))
+        .emit(NotesSocketEvents.UPDATE, swappedNote);
+    }
+    return { swappedNote };
   }
 
   @UseGuards(BoardAccessGuard)

@@ -52,6 +52,7 @@ model Note {
   width     Int
   height    Int
   boardId   Int
+  zIndex    Int
   board     Board    @relation(fields: [boardId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
